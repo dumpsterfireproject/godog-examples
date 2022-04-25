@@ -1,5 +1,10 @@
 package bankaccount
 
+// Note that this is purely for example purposes and is not production code quality. To better handle the
+// addition, substraction, etc., of the money in production code, look into using a library like the
+// decimal library at https://pkg.go.dev/github.com/ericlagergren/decimal.  I wrote my own implmentations here
+// purely for the purpose of being able to demostrate some tests.
+
 import (
 	"fmt"
 	"math"
@@ -7,7 +12,6 @@ import (
 
 const (
 	maxNanos = 999999999
-	// minNanos = -999999999
 )
 
 type Money struct {

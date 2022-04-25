@@ -5,6 +5,9 @@ import (
 	"sync"
 )
 
+// Note that this is purely for example purposes and is not production code quality. I wrote my own
+// implmentations here purely for the purpose of being able to demostrate some tests.
+
 type Account interface {
 	Balance() Money
 	Deposit(Money) error
@@ -12,7 +15,6 @@ type Account interface {
 }
 
 type SavingsAccount struct {
-	// mutex   *sync.Mutex
 	balance Money
 	sync.Mutex
 }
@@ -26,10 +28,8 @@ func WithBalance(m Money) SavingsAccountOption {
 }
 
 func NewSavingsAccount(opts ...SavingsAccountOption) *SavingsAccount {
-	// var mut sync.Mutex
 	m, _ := NewMoney(USD, 0, 0)
 	acct := &SavingsAccount{
-		// mutex:   &mut,
 		balance: m,
 	}
 	for _, opt := range opts {
