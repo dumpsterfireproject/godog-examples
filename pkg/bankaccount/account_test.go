@@ -9,65 +9,60 @@ import (
 	. "github.com/dumpsterfireproject/godog-examples/pkg/bankaccount"
 )
 
-// keys
-type accountKey struct{}
-type errorKey struct{}
+type AccountTestState struct {
+	account   Account
+	lastError error
+}
 
-//  helper methods
-func getAccount(ctx context.Context) Account {
-	acct := ctx.Value(accountKey{}).(Account)
-	return acct
+func (a *AccountTestState) reset() {
+	a.account = nil
+	a.lastError = nil
 }
 
 // Arrange steps
-func iHaveANewAccount(ctx context.Context) context.Context {
-	acct := NewSavingsAccount()
-	return context.WithValue(ctx, accountKey{}, acct)
+func (a *AccountTestState) iHaveANewAccount() {
+	a.account = NewSavingsAccount()
 }
 
-func iHaveAnAccountWith(ctx context.Context, units int, nanos int, currency string) context.Context {
-	m, _ := NewMoney(currency, int64(units), int32(nanos))
-	acct := NewSavingsAccount(WithBalance(m))
-	return context.WithValue(ctx, accountKey{}, acct)
+func (a *AccountTestState) iHaveAnAccountWith(units int, nanos int, currency string) error {
+	m, err := NewMoney(currency, int64(units), int32(nanos))
+	a.account = NewSavingsAccount(WithBalance(m))
+	return err
 }
 
 // Act steps
-func iDeposit(ctx context.Context, units int, nanos int, currency string) (context.Context, error) {
-	acct := getAccount(ctx)
+func (a *AccountTestState) iDeposit(units int, nanos int, currency string) error {
 	m, err := NewMoney(currency, int64(units), int32(nanos))
 	if err != nil {
-		return ctx, err
+		return err
 	}
-	err = acct.Deposit(m)
-	return context.WithValue(ctx, accountKey{}, acct), err
+	err = a.account.Deposit(m)
+	return err
 }
 
-func iWithdraw(ctx context.Context, units int, nanos int, currency string) (context.Context, error) {
-	acct := getAccount(ctx)
+func (a *AccountTestState) iWithdraw(units int, nanos int, currency string) error {
 	m, err := NewMoney(currency, int64(units), int32(nanos))
 	if err != nil {
-		return ctx, err
+		return err
 	}
-	err = acct.Withdraw(m)
-	return context.WithValue(ctx, accountKey{}, acct), err
+	err = a.account.Withdraw(m)
+	return err
 }
 
-func iTryToWithdraw(ctx context.Context, units int, nanos int, currency string) context.Context {
-	acct := getAccount(ctx)
+func (a *AccountTestState) iTryToWithdraw(units int, nanos int, currency string) error {
 	m, err := NewMoney(currency, int64(units), int32(nanos))
 	if err != nil {
-		return context.WithValue(ctx, errorKey{}, err)
+		return err
 	}
-	err = acct.Withdraw(m)
-	if err != nil {
-		return context.WithValue(ctx, errorKey{}, err)
-	}
-	return context.WithValue(ctx, accountKey{}, acct)
+	// this step does not fail if the withdrawal fails; it just stores the error for later validation
+	err = a.account.Withdraw(m)
+	a.lastError = err
+	return nil
 }
 
 // Assert steps
-func theAccountBalanceIs(ctx context.Context, units int, nanos int, currency string) error {
-	acct := getAccount(ctx)
+func (a *AccountTestState) theAccountBalanceIs(units int, nanos int, currency string) error {
+	acct := a.account
 	m, _ := NewMoney(currency, int64(units), int32(nanos))
 	if !acct.Balance().IsEqual(m) {
 		return fmt.Errorf("expected the account balance to be %s by found %s", m, acct.Balance())
@@ -75,26 +70,52 @@ func theAccountBalanceIs(ctx context.Context, units int, nanos int, currency str
 	return nil
 }
 
-func theTransactionShouldError(ctx context.Context) error {
-	err := ctx.Value(errorKey{})
-	if err == nil {
+func (a *AccountTestState) theTransactionShouldError() error {
+	if a.lastError == nil {
 		return fmt.Errorf("the expected error was not found")
 	}
 	return nil
 }
 
+func InitializeScenario(sc *godog.ScenarioContext) {
+	ts := &AccountTestState{}
+	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
+		ts.reset() // clean the state before every scenario
+		return ctx, nil
+	})
+	sc.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
+		return ctx, nil
+	})
+	// Add step definitions here.
+	sc.Step(`^I have a new account$`, ts.iHaveANewAccount)
+	sc.Step(`^I have an account with (\d+)\.(\d+) ([A-Z]{3})$`, ts.iHaveAnAccountWith)
+	sc.Step(`^I deposit (\d+)\.(\d+) ([A-Z]{3})$`, ts.iDeposit)
+	sc.Step(`^I withdraw (\d+)\.(\d+) ([A-Z]{3})$`, ts.iWithdraw)
+	sc.Step(`^I try to withdraw (\d+)\.(\d+) ([A-Z]{3})$`, ts.iTryToWithdraw)
+	sc.Step(`^the account balance must be (\d+)\.(\d+) ([A-Z]{3})$`, ts.theAccountBalanceIs)
+	sc.Step(`^the transaction should error$`, ts.theTransactionShouldError)
+}
+
+func IntializeTestSuite(sc *godog.TestSuiteContext) {
+	sc.BeforeSuite(func() {
+		// do any set up here one time before the entire test suite runs, e.g., create a database connection pool
+		// that would be too expensive to do before each scenario.
+	})
+	sc.AfterSuite(func() {
+		// do any clean up after the entire test suite is done executiong.
+	})
+	sc.ScenarioContext().StepContext().Before(func(ctx context.Context, st *godog.Step) (context.Context, error) {
+		return ctx, nil
+	})
+	sc.ScenarioContext().StepContext().After(func(ctx context.Context, st *godog.Step, status godog.StepResultStatus, err error) (context.Context, error) {
+		return ctx, nil
+	})
+}
+
 func TestFeatures(t *testing.T) {
 	suite := godog.TestSuite{
-		ScenarioInitializer: func(s *godog.ScenarioContext) {
-			// Add step definitions here.
-			s.Step(`^I have a new account$`, iHaveANewAccount)
-			s.Step(`^I have an account with (\d+)\.(\d+) ([A-Z]{3})$`, iHaveAnAccountWith)
-			s.Step(`^I deposit (\d+)\.(\d+) ([A-Z]{3})$`, iDeposit)
-			s.Step(`^I withdraw (\d+)\.(\d+) ([A-Z]{3})$`, iWithdraw)
-			s.Step(`^I try to withdraw (\d+)\.(\d+) ([A-Z]{3})$`, iTryToWithdraw)
-			s.Step(`^the account balance must be (\d+)\.(\d+) ([A-Z]{3})$`, theAccountBalanceIs)
-			s.Step(`^the transaction should error$`, theTransactionShouldError)
-		},
+		ScenarioInitializer:  InitializeScenario,
+		TestSuiteInitializer: IntializeTestSuite,
 		Options: &godog.Options{
 			Format:   "pretty",
 			Paths:    []string{"features"},
