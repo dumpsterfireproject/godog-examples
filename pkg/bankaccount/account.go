@@ -2,6 +2,7 @@ package bankaccount
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 )
 
@@ -10,8 +11,10 @@ import (
 
 type Account interface {
 	Balance() Money
+	BalanceAsCurrency(string) (Money, error)
 	Deposit(Money) error
 	Withdraw(Money) error
+	RemittanceAddress() string
 }
 
 type SavingsAccount struct {
@@ -42,6 +45,24 @@ func (s *SavingsAccount) Balance() Money {
 	return s.balance
 }
 
+func (s *SavingsAccount) BalanceAsCurrency(currencyCode string) (Money, error) {
+	conversion := exchangeRate{s.balance.CurrencyCode, currencyCode}
+	rate, found := CurrentRates.rates[conversion]
+	if !found {
+		return Money{}, fmt.Errorf("currency code not found in current exchange tables")
+	}
+	mantissa, exponent := asExponent(rate.Units, rate.Nanos)
+	m := s.balance.Multiply(int(mantissa), exponent)
+	m.CurrencyCode = currencyCode
+
+	return m, nil
+}
+
+func asExponent(units int64, nanos int32) (int, int) {
+	i, _ := strconv.Atoi(fmt.Sprintf("%d%09d", units, nanos))
+	return i, -9
+}
+
 func (s *SavingsAccount) Deposit(m Money) error {
 	s.Lock()
 	newBalance, err := s.balance.Add(m)
@@ -62,4 +83,8 @@ func (s *SavingsAccount) Withdraw(m Money) error {
 	}
 	s.Unlock()
 	return err
+}
+
+func (s *SavingsAccount) RemittanceAddress() string {
+	return "742 Evergreen Terrace\nSpringfield, OR"
 }
