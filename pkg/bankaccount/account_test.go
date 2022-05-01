@@ -2,6 +2,7 @@ package bankaccount_test
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"strconv"
 	"strings"
@@ -212,15 +213,23 @@ func IntializeTestSuite(sc *godog.TestSuiteContext) {
 	})
 }
 
+// os.Getenv("GODOG_TAGS")
+var tags = flag.String("godog.tags", "", "tags to execute")
+var format = flag.String("godog.format", "pretty", "format")
+
+var opts = &godog.Options{
+	Paths: []string{"features"},
+}
+
 func TestFeatures(t *testing.T) {
+	opts.TestingT = t
+	opts.Tags = *tags
+	opts.Format = *format
+
 	suite := godog.TestSuite{
 		ScenarioInitializer:  InitializeScenario,
 		TestSuiteInitializer: IntializeTestSuite,
-		Options: &godog.Options{
-			Format:   "pretty",
-			Paths:    []string{"features"},
-			TestingT: t, // Testing instance that will run subtests.
-		},
+		Options:              opts,
 	}
 
 	if suite.Run() != 0 {
