@@ -155,7 +155,8 @@ func (a *AccountTestState) theRemittanceAddressMustBe(input *godog.DocString) er
 	if a.account.RemittanceAddress() != input.Content {
 		return fmt.Errorf("expected %s but found %s", input.Content, a.account.RemittanceAddress())
 	}
-	return nil
+	// return nil
+	return fmt.Errorf("invalid remittance")
 }
 
 // helper functions
