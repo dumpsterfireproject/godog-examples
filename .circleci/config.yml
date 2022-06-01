@@ -24,6 +24,9 @@ jobs:
       - run:
           name: Install Dependencies
           command: go mod download
+      - run:
+          name: Install gocover
+          command: go install -v github.com/boumenot/gocover-cobertura
       - save_cache:
           key: go-mod-v4-{{ checksum "go.sum" }}
           paths:
